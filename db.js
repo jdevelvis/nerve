@@ -4,7 +4,8 @@
 var Datastore = require('nedb'), 
 	isJSON = require('./isJSON'),
 	_ = require('underscore'),
-	db = null
+	db = null,
+	log = require('./log')
 ;
 
 //----------------------------
@@ -14,7 +15,7 @@ module.exports.init = function(path, callback) {
 	//Try to load the DB, if you fail, throw error
 	try {
 		db = new Datastore({filename: path, autoload:true});
-		callback(false);
+		callback(null,true);
 	} catch (e) {
 		callback("Error loading DB: " + e);
 	}
@@ -23,21 +24,21 @@ module.exports.init = function(path, callback) {
 //----------------------------
 //Retrieve data from DB
 //----------------------------
-module.exports.find = function(find, options, callback) {
+module.exports.find = function(find, options, callback){
 	//Make sure the DB is loaded
-	if (db == null) callback(null, "The database isn't loaded! Cannot find records.");
+	if (db == null) callback("The database isn't loaded! Cannot find records.");
 
-	try {
-		db.find(find, options, function(err,docs) {
+	if (!options) options = {};
+
+//	log.write(find);
+	db.find(find, options, function(err,docs) {
+//		log.write("Find Returned: " + docs + " Error? " + err);
 	        if (!err) {
-    	        callback(docs, false);
-        	} else {
-	            callback(null, "Error: " + err);
-    	    }
-		});
-	} catch (e) {
-		callback(null, "Error finding data from DB: " + e);
-	}
+    		        callback(null, docs);
+       		} else {
+	        	callback("Error: " + err);
+		}
+	});
 }
 
 //----------------------------
@@ -50,9 +51,9 @@ module.exports.insert = function (record, callback) {
 	//Fire the insert command here
 	db.insert(record, function(err,newDoc) { 
 		if (!err) {
-			callback(newDoc._id);
+			callback(null, newDoc._id);
 		} else {
-			callback(null, "Error: " + err);
+			callback("Error: " + err);
 		}
 	});
 }
@@ -61,12 +62,16 @@ module.exports.insert = function (record, callback) {
 //Update record
 //----------------------------
 module.exports.update = function (query,update,options,callback) {
-	if (_.isNumeric(query)) query = { _id: query };
+	if (_.isNumber(query)) query = { _id: query };
+
+	//If options = null, set it to {} to prevent Object.keys error
+	if (!options) options = {};
+
 	db.update(query,update,options, function(err, numReplaced) {
 		if (!err) 
-			callback(numReplaced);
+			callback(null, numReplaced);
 		else
-			callback(null,"There was an error while updating the record! " + err);
+			callback("There was an error while updating the record! " + err);
 	});
 }
 
@@ -75,11 +80,15 @@ module.exports.update = function (query,update,options,callback) {
 //----------------------------
 module.exports.remove = function (query, options, callback) {
 	if (_.isNumber(query)) query = { _id: query };
+
+	//If options = null, set it to {} to prevent Object.keys error
+	if (!options) options = {};
+
 	db.remove(query,options,function(err, numRemoved) {
 		if (!err)
-			callback(numRemoved);
+			callback(null, numRemoved);
 		else
-			callback(null, "There was an error while removing the record! " + err);
+			callback("There was an error while removing the record! " + err);
 	});
 }
 
