@@ -1,47 +1,94 @@
 //###TODO: Add login capabilities if required by admin settings
 //Should have secure option as well
 
-var ws = require('ws'),
-	log = require('./log'),
+var log = require('./log'),
 	isJSON = require('./isJSON'),
 	things = require('./things'),
 	db = require('nedb')
 ;
 
-module.exports.init = function() {
-/*	var WebSocketServer = require('ws').Server
-	  , wss = new WebSocketServer({port: 8080});
+var WebSocketServer = require('ws').Server,
+	wss = new WebSocketServer({port: 8080})
+;
+
+
+module.exports.init = function(callback) {
+//	this.wss = new WebSocketServer({port: 8080});
+
+	log.write('####### Initiating wss Connection');
+
 	wss.on('connection', function(ws) {
-		//Fire handshake
+		//###TODO: Begin handshake
 		console.log('Connection initiated, awaiting commands');
 
-		//We need to wait on messages to verify the handshake
+		//Listen for messages
 	    	ws.on('message', function(message) {
-			//Is this a handshake message?
-			//Or is this client verified already
+			//###TODO: Implement handshake verification
+
 			if (isJSON(message)) {
 				message = JSON.parse(message);
-       				console.log('received: %s', message);
-				ws.send("Sending " + message.command + " to " + message.uuid);
+				switch (message.type) {
+					case 'list_things':
+						//Send list of thing IDs, names, & states
+						log.write("Listing things...");
+						var arr = things.list_things();
+						var data = '';
+						for (var i=0; i<arr.length; i++) {
+							data += JSON.stringify(arr[i]) + ",";
+						}
+						data = "[" + data.substring(0,data.length-1) + "]";
+						ws.send('{"response":"list_things","conversation_id":"' + message.conversation_id + '","outcome":"success","data":' + data + "}");
+					break;
+					case 'command':
+//       				log.write('Received message:');
+//				log.write(message);
+				//ws.send("Sending " + message.command + " to " + message.uuid);
 				
-				things.send_message(message,function(err, t) {
-					if (err) {
-						log.write("Error: " + err);
-					} else {
-						log.write("Message sent:");
-						log.write(message);
-						ws.send("Success!");								
-					}
-				});
+						things.receive_message(message,function(err, t) {
+							if (err) {
+								log.write("Error: " + err);
+								ws.send('{"response":"command","conversation_id":"'+message.conversation_id+'","outcome":"error","data":"'+err+'"}');
+							} else {
+								log.write("Message retreived and passed on:");
+								log.write(message);
+								ws.send('{"response":"command","conversation_id":"'+message.conversation_id+'","outcome":"success"}');
+							}
+						});
+					break;
+					default:
+				}
 			} else {
-				ws.send("Error: Messages must be JSON format. You sent '" + message + "'");
+				message = message.replace('"','\"');
+				ws.send('{"response":"message","outcome":"error","data":"Error: Messages must be JSON format. You sent: ' + message + '"}');
 			}
 	    	});
 
 		//Send message to initiate handshake
-		ws.send('{"status": "waiting"}');
+		ws.send('{"response": "connected"}');
 	});
-*/
+	callback();
 }
 
-module.exports.init();
+module.exports.broadcast = function(response, conversation_id, outcome, data) {
+	if (wss != undefined) {
+		wss.clients.forEach(function each(client) {
+			response = response.replace(/"/g,'\\\"');
+			outcome = outcome.replace(/"/g,'\\\"');
+			conversation_id = conversation_id.replace(/"/g,'\\\"');
+			data = data.replace(/"/g,'\\\"');
+			client.send('{"response":"' + response + '","conversation_id":"' + conversation_id + '","outcome":"' + outcome +'","data":"' + data + '"}');
+			log.write('{"response":"' + response + '","conversation_id":"' + conversation_id + '","outcome":"' + outcome +'","data":"' + data + '"}');
+		});
+	}
+/*
+	self = this;
+	log.write("in ws.send");
+	log.write(this.ws);
+	log.write(self.ws);
+	log.write(ws);
+	if (self.ws != undefined) {
+		log.write("Sending new message: " + data);
+		self.ws.send('{"response":"' + response + '","conversation_id":"' + conversation_id + '","outcome":"' + outcome +'","data":"' + data + '"}');
+	}
+*/
+}

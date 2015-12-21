@@ -5,27 +5,29 @@ var wemo = require("upnp-controlpoint/lib/wemo"),
 ;
 
 function Wemo(device) {
-	this.name = "Wemo";
-	this.type = '';
-	this.connected = false;
-	this.device = device;
-	this.wemoDevice = null;
-	this.state = null;
+	this._name = "Wemo";
+	this._type = '';
+	this._connected = false;
+	this._device = device;
+	this._wemoDevice = null;
+	this._state = null;
 
 //	log.write("device type: " + device.deviceType + " location: " + device.location);
 
         switch(device.deviceType) {
 	    //Because WeMo Switches & Outlets are similar
             case wemo.WemoControllee.deviceType:
-		this.type = "switch";
-		this.name = "WeMo Switch";
+		this._type = "switch";
+		this._name = "WeMo Switch";
             case "urn:Belkin:device:lightswitch:1": //This should probably be added to the wemo.js part of the upnp-controlpoint module
-		this.type = "switch";
-		this.name = "WeMo Light Switch";
+		if (this._type == '')
+			this._type = "switch";
+		if (this._name == '')
+			this._name = "WeMo Light Switch";
 
                 console.log("======== Wemo Device Found! ========");
 //		console.log(device.uuid);
-		this.connected = true;
+		this._connected = true;
 /*		GLOBAL.track_thing(device.uuid, type, 
 		  module.filename.slice(__filename.lastIndexOf(path.sep)+1, module.filename.length),
 		  device, name);
@@ -37,8 +39,8 @@ function Wemo(device) {
 		//Or can we set up a new controllee reference each time we 
 		//want to issue a command, then kill it?
 			//Would that change how we handle the controllees here?
-                this.wemoDevice = new wemo.WemoControllee(device);
-                this.wemoDevice.on("BinaryState", function(value) {
+                this._wemoDevice = new wemo.WemoControllee(device);
+                this._wemoDevice.on("BinaryState", function(value) {
                         console.log("wemo switch state change: " + value);
                 });
 
@@ -55,8 +57,8 @@ function Wemo(device) {
             case wemo.WemoSensor.deviceType:
 		//###TODO: Update & test this section, as I don't have a sensor
 		//to test it with
-                this.wemoDevice = new wemo.WemoSensor(device);
-                wemoDevice.on("BinaryState", function(value) {
+                this._wemoDevice = new wemo.WemoSensor(device);
+                this._wemoDevice.on("BinaryState", function(value) {
                         console.log("wemo motion sensor state change: " + value);
                 });
 
@@ -64,7 +66,7 @@ function Wemo(device) {
 		  , module.filename.length),
 		  device, "WeMo Sensor");
 */
-		this.connected = true;
+		this._connected = true;
 		return true;
                 break;
 
@@ -74,30 +76,78 @@ function Wemo(device) {
         }
 };
 
-Wemo.prototype.take_action = function(action) {
-	log.write("+++Action supplied: " + action);
+Wemo.prototype.receive_message = function(message, callback) {
+	if (callback == undefined) callback = function() {}
+
+        log.write("Message Received By " + this.uuid());
+	log.write("test");
+        switch (message.type) {
+                case 'command':
+			log.write("In Case Command: " + this.uuid());
+                        switch (message.command) {
+                                case 'on':
+                                        log.write("++++++Turning on: " + this.uuid());
+		                        this._wemoDevice.setBinaryState(true);
+                                        callback(null, '{"response":"Success!"}');
+                                        break;
+                                case 'off':
+                                        log.write("++++++Turning off: " + this.uuid());
+		                        this._wemoDevice.setBinaryState(false);
+                                        callback(null, '{"response":"Success!"}');
+                                        break;
+                                default:
+                                        callback("Error: Invalid Command Type");
+                                        break;
+                        }
+                        break;
+                case 'query':
+			log.write("In Case Query: " + this.uuid());
+                        switch (message.info) {
+                                case 'state':
+					//###TODO: State querying
+                                        log.write("++++++Querying State: zwave" + this._nodeinfo.nodeid);
+                                        callback(null,'{"uuid":"' + this.uuid() + '"}');
+                                        break;
+                                default:
+                                        callback("Error: Invalid Info Type");
+                                        break;
+                        }
+                        break;
+                default:
+			log.write("In Default Case: " + this.uuid());
+                        callback("Error: Invalid Message Type");
+                        break;
+        }
 };
 
 Wemo.prototype.is_connected = function() {
-	return this.connected;	
+	return this._connected;	
 }
 
 Wemo.prototype.uuid = function() {
-	return this.device.uuid;
+	return this._device.uuid;
 }
 
 Wemo.prototype.name = function() {
-	return this.name;
+	return this._name;
 }
 
 Wemo.prototype.type = function() {
-	return this.type;
+	return this._type;
+}
+
+Wemo.prototype.room = function() {
+        return '';
+}
+
+Wemo.prototype.tags = function() {
+        return '';
 }
 
 Wemo.prototype.state_data = function() {
 	return {"available_actions": ["on","off"],
 		"available_states": ["on","off"],
-		"current_state": this.state};
+		"current_state": this._state};
 }
 
 module.exports = Wemo;
@@ -107,10 +157,10 @@ module.exports = Wemo;
 //Init funciton, set aside because it's static
 //============================================
 
-module.exports.init = function() {
+module.exports.init = function(plugins) {
 	//Add this plugin to the global list of controllers, no instance necessary as this
 	//will be instantiated once per device
-	GLOBAL.add_controller(
+	plugins.add_controller(
 	  module.filename.slice(__filename.lastIndexOf(path.sep)+1, module.filename.length),
 	  'UPnP Protocol Plugin'
 	);

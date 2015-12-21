@@ -8,19 +8,19 @@ var log = require("./log");
 //----------------------------
 //Init function opens and loads the database
 //----------------------------
-module.exports.init = function(callback) {
+module.exports.init = function(plugins, things) {
 	log.write ("--- Searching For Things via Protocols ---");
 
-try {
-	keys = Object.keys(GLOBAL.protocols);
-	for (var i=0; i < keys.length; i++) {
-		element = GLOBAL.protocols[keys[i]][0];
-       		element.plugin.search();
+	try {
+		protocols = plugins.protocols();
+		keys = Object.keys(protocols);
+		for (var i=0; i < keys.length; i++) {
+			log.write("Starting search for: " + keys[i]);
+			element = protocols[keys[i]][0];
+       			element.plugin.search(plugins);
+		}
+		return 'Protocols Loaded';
+	} catch (e) {
+		return "Something happened: " + e;
 	}
-	callback(null,'Protocols Loaded');
-} catch (e) {
-	callback("Something happened: " + e,'');
-}
-
-//	setTimeout(search,10000); //###TODO: Set timeout longer? This is only really important as we load plugins
 }
