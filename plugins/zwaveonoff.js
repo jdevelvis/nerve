@@ -10,6 +10,7 @@ function zwaveonoff(nodeinfo, zwave_object) {
 	this._zwaveDevice = null;
 	this._state = null;
 	this._zwave = zwave_object; //Reference to the zwave object so we can issue commands
+	this._things = null;
 
 	log.write("------------ Node info: ");
 	log.write(this._nodeinfo);
@@ -21,7 +22,8 @@ function zwaveonoff(nodeinfo, zwave_object) {
 			case "5252": //Duplex Recepticle
 			log.write("Successfully created zwave on/off device!");
 			this._connected = true;
-//			this._state = 
+			this._state = this._nodeinfo.values['37']['0'].value;
+			log.write("###### State: " + this._state);
 			break;
 		}
 	}
@@ -52,17 +54,16 @@ zwaveonoff.prototype.tags = function() {
 	return '';
 }
 
-zwaveonoff.prototype.state_data = function() {
-	return {"available_actions": ["on","off"],
-		"available_states": ["on","off"],
-		"current_state": this.state};
+zwaveonoff.prototype.state = function() {
+	return this._state;
 }
 
 zwaveonoff.prototype.receive_message = function(message, callback) {
         log.write("Message Received By zwave" + this._nodeinfo.nodeid);
+//	log.write(message.state);
 	switch (message.type) {
 		case 'command':
-			switch (message.command) {
+			switch (message.state) {
 				case 'on':
 					log.write("++++++Turning on: zwave" + this._nodeinfo.nodeid);
 					this._zwave.switchOn(this._nodeinfo.nodeid);
@@ -103,7 +104,10 @@ module.exports = zwaveonoff;
 //Init funciton, set aside because it's static
 //============================================
 
-module.exports.init = function(plugins) {
+module.exports.init = function(plugins, things_object) {
+        //Save reference to things objet
+        this._things = things_object;
+
 	//Add this plugin to the global list of controllers, no instance necessary as this
 	//will be instantiated once per device
 	plugins.add_controller(

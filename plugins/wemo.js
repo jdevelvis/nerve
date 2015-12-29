@@ -5,12 +5,16 @@ var wemo = require("upnp-controlpoint/lib/wemo"),
 ;
 
 function Wemo(device) {
+	log.write("Instantiating Wemo Device Class");
 	this._name = "Wemo";
 	this._type = '';
 	this._connected = false;
 	this._device = device;
 	this._wemoDevice = null;
 	this._state = null;
+	this._things = null;
+	
+	var self = this;
 
 //	log.write("device type: " + device.deviceType + " location: " + device.location);
 
@@ -39,9 +43,19 @@ function Wemo(device) {
 		//Or can we set up a new controllee reference each time we 
 		//want to issue a command, then kill it?
 			//Would that change how we handle the controllees here?
+/*
+log.write("device.desc: ");
+log.write(device.desc);
+log.write("Services: ");
+log.write(device.services);*/
+
+
                 this._wemoDevice = new wemo.WemoControllee(device);
                 this._wemoDevice.on("BinaryState", function(value) {
                         console.log("wemo switch state change: " + value);
+			self._state = value;
+
+			self._things.update(this._uuid, this._name, value);
                 });
 
 /*                setTimeout(function() {
@@ -144,10 +158,8 @@ Wemo.prototype.tags = function() {
         return '';
 }
 
-Wemo.prototype.state_data = function() {
-	return {"available_actions": ["on","off"],
-		"available_states": ["on","off"],
-		"current_state": this._state};
+Wemo.prototype.state = function() {
+	return this._state;
 }
 
 module.exports = Wemo;
@@ -157,7 +169,10 @@ module.exports = Wemo;
 //Init funciton, set aside because it's static
 //============================================
 
-module.exports.init = function(plugins) {
+module.exports.init = function(plugins, things_object) {
+	//Save reference to things objet
+	this._things = things_object;
+
 	//Add this plugin to the global list of controllers, no instance necessary as this
 	//will be instantiated once per device
 	plugins.add_controller(
